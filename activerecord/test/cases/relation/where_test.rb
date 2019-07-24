@@ -416,5 +416,19 @@ module ActiveRecord
     def test_where_with_unsupported_arguments
       assert_raises(ArgumentError) { Author.where(42) }
     end
+
+    def test_does_not_copy_optimizer_hints
+      author = authors(:david)
+      posts_without_hint = author.posts.where("posts.id != 1")
+      posts_with_hint = posts_without_hint.optimizer_hints("OMG")
+      joined = Post.where(id: posts).optimizer_hints("OMG")
+
+      expected = Post.where(id: posts_without_hint).optimizer_hints("OMG").to_sql
+      actual = Post.where(id: posts_with_hint).optimizer_hints("OMG").to_sql
+
+      assert_equal expected, actual
+
+      assert_equal 1, actual.scan(/\/\*\+ OMG \*\//).count
+    end
   end
 end
