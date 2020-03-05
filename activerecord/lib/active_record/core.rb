@@ -379,6 +379,14 @@ module ActiveRecord
       self
     end
 
+    def _metadata=(value)
+      @_metadata = value
+    end
+
+    def _metadata
+      @_metadata
+    end
+
     ##
     # :method: clone
     # Identical to Ruby's clone method.  This is a "shallow" copy.  Be warned that your attributes are not copied.

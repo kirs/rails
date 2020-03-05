@@ -253,9 +253,9 @@ module ActiveRecord
       #
       # See <tt>ActiveRecord::Inheritance#discriminate_class_for_record</tt> to see
       # how this "single-table" inheritance mapping is implemented.
-      def instantiate(attributes, column_types = {}, &block)
+      def instantiate(attributes, column_types = {}, metadata = nil, &block)
         klass = discriminate_class_for_record(attributes)
-        instantiate_instance_of(klass, attributes, column_types, &block)
+        instantiate_instance_of(klass, attributes, column_types, metadata, &block)
       end
 
       # Updates an object (or multiple objects) and saves it to the database, if validations pass.
@@ -398,9 +398,11 @@ module ActiveRecord
       private
         # Given a class, an attributes hash, +instantiate_instance_of+ returns a
         # new instance of the class. Accepts only keys as strings.
-        def instantiate_instance_of(klass, attributes, column_types = {}, &block)
+        def instantiate_instance_of(klass, attributes, column_types = {}, metadata = nil, &block)
           attributes = klass.attributes_builder.build_from_database(attributes, column_types)
-          klass.allocate.init_with_attributes(attributes, &block)
+          klass.allocate.init_with_attributes(attributes, &block).tap do |record|
+            record._metadata = metadata
+          end
         end
 
         # Called by +instantiate+ to decide which class to use for a new
