@@ -101,5 +101,13 @@ module ActiveRecord
 
       assert_equal [[1.1, 2.2], [3.3, 4.4]], result.cast_values("col1" => Type::Float.new)
     end
+
+    test "accepts optional metadata" do
+      result = Result.new([], [])
+      assert_nil(result.metadata)
+
+      result = Result.new([], [], {}, { foo: :bar })
+      assert_equal({ foo: :bar }, result.metadata)
+    end
   end
 end
