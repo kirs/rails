@@ -181,3 +181,6 @@ if RUBY_VERSION >= "3.1"
   # So we need to add it as a dependency until `capybara` is fixed: https://github.com/teamcapybara/capybara/pull/2468
   gem "matrix", require: false
 end
+
+gem 'db-mariadb'
+gem 'db', '~> 0.8'

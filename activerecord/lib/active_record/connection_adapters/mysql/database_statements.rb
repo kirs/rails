@@ -11,8 +11,11 @@ module ActiveRecord
           else
             super
           end
-          @connection.abandon_results!
           result
+        end
+
+        def abandon_results!
+          @connection.abandon_results!
         end
 
         def query(sql, name = nil) # :nodoc:
