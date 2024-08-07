@@ -149,5 +149,29 @@ module ActiveRecord
       end
       assert_kind_of ActiveRecord::QueryAborted, error
     end
+
+    test "reconnect preserves isolation level" do
+      ActiveRecord::Base.logger = Logger.new(STDOUT).tap do |l|
+        l.level = Logger::DEBUG
+      end
+
+      @connection = Sample.lease_connection
+      @connection.instance_eval do
+        # Simulates the first BEGIN attempt failing
+        def perform_query(raw_connection, sql, binds, type_casted_binds, **kwargs)
+          if sql == "BEGIN" && !@first_begin_failed
+            @first_begin_failed = true
+            raise ActiveRecord::DatabaseConnectionError
+          end
+          super
+        end
+      end
+
+      Sample.transaction(isolation: :read_committed) do
+        @connection.materialize_transactions
+        isolation = @connection.select_value("SELECT ISOLATION_LEVEL FROM performance_schema.events_transactions_current where THREAD_ID=PS_CURRENT_THREAD_ID()")
+        assert_equal "READ COMMITTED", isolation
+      end
+    end
   end
 end
