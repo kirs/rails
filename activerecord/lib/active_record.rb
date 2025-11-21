@@ -132,8 +132,6 @@ module ActiveRecord
   module AttributeMethods
     extend ActiveSupport::Autoload
 
-    autoload :CompositePrimaryKey
-
     eager_autoload do
       autoload :BeforeTypeCast
       autoload :Dirty
