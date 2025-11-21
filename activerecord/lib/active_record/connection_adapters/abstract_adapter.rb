@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_record/connection_adapters/sql_type_metadata"
+require "active_record/connection_adapters/model_schema_definition"
 require "active_record/connection_adapters/abstract/schema_dumper"
 require "active_record/connection_adapters/abstract/schema_creation"
 require "active_support/concurrency/null_lock"
@@ -182,6 +183,8 @@ module ActiveRecord
         @verified = false
 
         @pool_jitter = rand * max_jitter
+
+        @model_schemas = Concurrent::Map.new
       end
 
       def inspect # :nodoc:
@@ -319,6 +322,21 @@ module ActiveRecord
 
       def schema_cache
         @pool.schema_cache || (@schema_cache ||= BoundSchemaReflection.for_lone_connection(@pool.schema_reflection, self))
+      end
+
+      # Get model-specific schema definition
+      def model_schema(model_class)
+        @model_schemas.compute_if_absent(model_class.name) { ModelSchemaDefinition.new(model_class, self) }
+      end
+
+      # Clear schema for specific model
+      def clear_model_schema!(model_class)
+        @model_schemas.delete(model_class.name)
+      end
+
+      # Clear all model schemas
+      def clear_all_model_schemas!
+        @model_schemas.clear
       end
 
       def pool_jitter(duration)
@@ -799,6 +817,8 @@ module ActiveRecord
             end
           end
         end
+        # Clear model schemas when clearing cache
+        clear_all_model_schemas!
       end
 
       # Returns true if its required to reload the connection between requests for development mode.

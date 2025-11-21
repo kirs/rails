@@ -844,7 +844,8 @@ module ActiveRecord
 
         klass = self.class
 
-        @primary_key         = klass.primary_key
+        @primary_key = klass.primary_key
+        @composite_primary_key = klass.composite_primary_key?
         @strict_loading      = klass.strict_loading_by_default
         @strict_loading_mode = klass.strict_loading_mode
 

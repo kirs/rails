@@ -89,6 +89,10 @@ module ActiveRecord
         end
       end
 
+      def composite_primary_key?
+        @composite_primary_key
+      end
+
       private
         def attribute_method?(attr_name)
           attr_name == "id" || super
@@ -96,7 +100,6 @@ module ActiveRecord
 
         module ClassMethods
           ID_ATTRIBUTE_METHODS = %w(id id= id? id_before_type_cast id_was id_in_database id_for_database).to_set
-          PRIMARY_KEY_NOT_SET = BasicObject.new
 
           def instance_method_already_implemented?(method_name)
             super || primary_key && ID_ATTRIBUTE_METHODS.include?(method_name)
@@ -110,13 +113,11 @@ module ActiveRecord
           # Overwriting will negate any effect of the +primary_key_prefix_type+
           # setting, though.
           def primary_key
-            reset_primary_key if PRIMARY_KEY_NOT_SET.equal?(@primary_key)
-            @primary_key
+            connection.model_schema(self).primary_key
           end
 
           def composite_primary_key? # :nodoc:
-            reset_primary_key if PRIMARY_KEY_NOT_SET.equal?(@primary_key)
-            @composite_primary_key
+            connection.model_schema(self).composite_primary_key?
           end
 
           # Returns a quoted version of the primary key name.
@@ -125,11 +126,9 @@ module ActiveRecord
           end
 
           def reset_primary_key # :nodoc:
-            if base_class?
-              self.primary_key = get_primary_key(base_class.name)
-            else
-              self.primary_key = base_class.primary_key
-            end
+            # Clear the model schema in connection and force re-detection
+            connection.clear_model_schema!(self)
+            primary_key
           end
 
           def get_primary_key(base_name) # :nodoc:
@@ -160,26 +159,8 @@ module ActiveRecord
           #
           #   Project.primary_key # => "foo_id"
           def primary_key=(value)
-            @primary_key = if value.is_a?(Array)
-              include CompositePrimaryKey
-              @primary_key = value.map { |v| -v.to_s }.freeze
-            elsif value
-              -value.to_s
-            end
-
-            @composite_primary_key = value.is_a?(Array)
-            @attributes_builder = nil
+            connection.model_schema(self).primary_key = value
           end
-
-          private
-            def inherited(base)
-              super
-              base.class_eval do
-                @primary_key = PRIMARY_KEY_NOT_SET
-                @composite_primary_key = false
-                @attributes_builder = nil
-              end
-            end
         end
     end
   end

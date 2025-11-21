@@ -434,29 +434,22 @@ module ActiveRecord
       end
 
       def attributes_builder # :nodoc:
-        @attributes_builder ||= begin
-          defaults = _default_attributes.except(*(column_names - [primary_key]))
-          ActiveModel::AttributeSet::Builder.new(attribute_types, defaults)
-        end
+        load_schema
+        connection.model_schema(self).attributes_builder
       end
 
       def columns_hash # :nodoc:
-        load_schema unless @columns_hash
-        @columns_hash
+        load_schema
+        connection.model_schema(self).columns_hash
       end
 
       def columns
-        @columns ||= columns_hash.values.freeze
+        load_schema
+        connection.model_schema(self).columns
       end
 
       def _returning_columns_for_insert(connection) # :nodoc:
-        @_returning_columns_for_insert ||= begin
-          auto_populated_columns = columns.filter_map do |c|
-            c.name if connection.return_value_after_insert?(c)
-          end
-
-          auto_populated_columns.empty? ? Array(primary_key) : auto_populated_columns
-        end
+        connection.model_schema(self).returning_columns_for_insert
       end
 
       def yaml_encoder # :nodoc:
@@ -567,18 +560,19 @@ module ActiveRecord
         end
 
         def reload_schema_from_cache(recursive = true)
-          @_returning_columns_for_insert = nil
+          # Clear the model schema in the connection
+          connection.clear_model_schema!(self)
+
+          # Clear other cached state
           @arel_table = nil
           @column_names = nil
           @symbol_column_to_string_name_hash = nil
           @content_columns = nil
           @column_defaults = nil
-          @attributes_builder = nil
-          @columns = nil
-          @columns_hash = nil
-          @schema_loaded = false
           @attribute_names = nil
           @yaml_encoder = nil
+          @schema_loaded = false
+
           if recursive
             subclasses.each do |descendant|
               descendant.send(:reload_schema_from_cache)
@@ -606,15 +600,12 @@ module ActiveRecord
             raise ActiveRecord::TableNotSpecified, "#{self} has no table configured. Set one with #{self}.table_name="
           end
 
-          columns_hash = schema_cache.columns_hash(table_name)
-          if only_columns.present?
-            columns_hash = columns_hash.slice(*only_columns)
-          elsif ignored_columns.present?
-            columns_hash = columns_hash.except(*ignored_columns)
-          end
-          @columns_hash = columns_hash.freeze
+          # Ensure connection has the model schema loaded
+          schema = connection.model_schema(self)
+          schema.columns_hash  # Triggers lazy loading
 
-          _default_attributes # Precompute to cache DB-dependent attribute types
+          # Precompute default attributes
+          _default_attributes
         end
 
         # Guesses the table name, but does not decorate it with prefix and suffix information.
