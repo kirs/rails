@@ -946,6 +946,10 @@ module ActiveRecord
           else
             -primary_key.to_s
           end
+        elsif polymorphic? && klass && (inverse_pk = inverse_primary_key_for_polymorphic(klass))
+          # For polymorphic belongs_to, check if the inverse association on the
+          # target class specifies a custom primary_key
+          inverse_pk.to_s
         elsif (klass || self.klass).has_query_constraints? || options[:query_constraints]
           (klass || self.klass).composite_query_constraints_list
         elsif (klass || self.klass).composite_primary_key?
@@ -972,6 +976,41 @@ module ActiveRecord
       private
         def can_find_inverse_of_automatically?(*)
           !polymorphic? && super
+        end
+
+        # Finds the primary_key option from the inverse association on the target
+        # class for polymorphic belongs_to associations.
+        #
+        # For example, if we have:
+        #   class Event < ActiveRecord::Base
+        #     belongs_to :eventable, polymorphic: true
+        #   end
+        #
+        #   class ShoppingSession < ActiveRecord::Base
+        #     has_many :events, as: :eventable, primary_key: :legacy_id
+        #   end
+        #
+        # When resolving event.eventable where eventable_type is "ShoppingSession",
+        # this method returns :legacy_id so the lookup uses legacy_id instead of
+        # the default primary key.
+        #
+        # Returns nil if:
+        # - No inverse associations found
+        # - Multiple inverse associations with conflicting primary_key options
+        #   (in this case, fall back to default behavior for safety)
+        def inverse_primary_key_for_polymorphic(klass)
+          # Find all associations on klass that point back to us via `as: :name`
+          inverse_associations = klass.reflect_on_all_associations.select do |inverse_reflection|
+            inverse_reflection.options[:as]&.to_s == name.to_s
+          end
+
+          return nil if inverse_associations.empty?
+
+          # Collect all primary_key options
+          primary_keys = inverse_associations.map { |assoc| assoc.options[:primary_key] }.uniq
+
+          # Only use the custom primary_key if all inverse associations agree
+          primary_keys.size == 1 ? primary_keys.first : nil
         end
     end
 

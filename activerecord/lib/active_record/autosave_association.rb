@@ -576,6 +576,9 @@ module ActiveRecord
       def compute_primary_key(reflection, record)
         if primary_key_options = reflection.options[:primary_key]
           primary_key_options
+        elsif reflection.polymorphic? && (inverse_pk = inverse_primary_key_for_polymorphic(reflection, record.class))
+          # For polymorphic belongs_to, check if the inverse association specifies a custom primary_key
+          inverse_pk
         elsif reflection.options[:query_constraints] && (query_constraints = record.class.query_constraints_list)
           query_constraints
         elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
@@ -587,6 +590,21 @@ module ActiveRecord
         else
           record.class.primary_key
         end
+      end
+
+      def inverse_primary_key_for_polymorphic(reflection, klass)
+        # Find all associations on klass that point back to us via `as: :name`
+        inverse_associations = klass.reflect_on_all_associations.select do |inverse_reflection|
+          inverse_reflection.options[:as]&.to_s == reflection.name.to_s
+        end
+
+        return nil if inverse_associations.empty?
+
+        # Collect all primary_key options
+        primary_keys = inverse_associations.map { |assoc| assoc.options[:primary_key] }.uniq
+
+        # Only use the custom primary_key if all inverse associations agree
+        primary_keys.size == 1 ? primary_keys.first : nil
       end
 
       def _ensure_no_duplicate_errors

@@ -200,6 +200,34 @@ module ActiveRecord
     end
   end
 
+  # Raised when multiple associations on the same model use the same polymorphic
+  # +as:+ option but have conflicting +primary_key+ options.
+  #
+  # For example:
+  #
+  #   class ShoppingSession < ActiveRecord::Base
+  #     has_many :events, as: :eventable, primary_key: :legacy_id
+  #     has_many :audit_logs, as: :eventable, primary_key: :audit_ref_id  # Error!
+  #   end
+  #
+  # All associations that share the same polymorphic interface must use the same
+  # +primary_key+ so that the inverse +belongs_to+ association can consistently
+  # look up records.
+  class AmbiguousPolymorphicPrimaryKeyError < ActiveRecordError
+    def initialize(model_name = nil, polymorphic_name = nil, new_association = nil, new_primary_key = nil, existing_association = nil, existing_primary_key = nil)
+      if model_name && polymorphic_name
+        super(
+          "Association #{model_name}##{new_association} with `as: :#{polymorphic_name}` " \
+          "and `primary_key: #{new_primary_key.inspect}` conflicts with association " \
+          "#{model_name}##{existing_association} which uses `primary_key: #{existing_primary_key.inspect}`. " \
+          "All associations with the same polymorphic `as:` must use the same `primary_key`."
+        )
+      else
+        super("Ambiguous polymorphic primary key error.")
+      end
+    end
+  end
+
   class AmbiguousSourceReflectionForThroughAssociation < ActiveRecordError # :nodoc:
     def initialize(klass, macro, association_name, options, possible_sources)
       example_options = options.dup

@@ -1179,6 +1179,19 @@ ActiveRecord::Schema.define do
     t.references :customer_carrier
   end
 
+  create_table :shopping_sessions, primary_key: [:shop_id, :session_id], force: true do |t|
+    t.string :shop_id, null: false
+    t.string :session_id, null: false
+    t.bigint :legacy_id, null: false
+    t.string :name
+    t.index :legacy_id, unique: true
+  end
+
+  create_table :session_events, force: true do |t|
+    t.references :eventable, polymorphic: true, index: false
+    t.string :action
+  end
+
   create_table :speedometers, force: true, id: false do |t|
     t.string :speedometer_id
     t.string :name
